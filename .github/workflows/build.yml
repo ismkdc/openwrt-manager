@@ -49,11 +49,8 @@ jobs:
             target: aarch64-unknown-linux-gnu
             suffix: linux-arm64
             bundle: deb
-          # Linux ARMhf - cross-compile from x64 (no native armv7 runner)
-          - os: ubuntu-24.04
-            target: armv7-unknown-linux-gnueabihf
-            suffix: linux-armhf
-            bundle: deb
+          # Linux ARMhf - SKIPPED: cross-compiling GTK/WebKit is not feasible on CI
+          # Build natively on the target device instead.
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -100,15 +97,7 @@ jobs:
             libjavascriptcoregtk-4.1-dev \
             gcc-aarch64-linux-gnu
 
-      - name: Install Linux deps + cross-compiler (ARMhf)
-        if: runner.os == 'Linux' && matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
-            patchelf libssl-dev libgtk-3-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            gcc-arm-linux-gnueabihf
+
 
       # --- Windows ---
       - name: Install Windows deps
@@ -118,15 +107,7 @@ jobs:
           # WebView2 is preinstalled on Windows runners
           echo "WebView2 available"
 
-      # --- Cargo config for cross-compilation ---
-      - name: Configure cargo for cross-compile (ARMhf)
-        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << 'EOF'
-          [target.armv7-unknown-linux-gnueabihf]
-          linker = "arm-linux-gnueabihf-gcc"
-          EOF
+
 
       # --- Build ---
       - name: Build Tauri app

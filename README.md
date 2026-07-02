@@ -27,7 +27,6 @@
 | Windows x64 | `.msi`, `.exe` |
 | Windows ARM64 | `.msi` |
 | Linux x64 | `.deb`, `.AppImage` |
-| Linux ARM (Raspberry Pi) | `.deb`, `.AppImage` |
 | Linux ARM64 | `.deb`, `.AppImage` |
 
 ## 🚀 Quick Start
