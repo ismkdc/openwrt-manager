@@ -87,16 +87,6 @@ The app communicates with OpenWrt routers via the **ubus** JSON-RPC protocol ove
 - **Protocol**: ubus JSON-RPC (same as LuCI)
 - **Build**: GitHub Actions (matrix builds for 8 platforms)
 
-## 📸 Screenshots
-
-| Dashboard | Network | Wireless |
-|:---:|:---:|:---:|
-| ![Dashboard](ss.png) | | |
-
-## 🤝 Contributing
-
-PRs welcome! This is a community project - the more contributors, the better the router management experience gets.
-
 ## 📄 License
 
-MIT
+[MIT](LICENSE)
