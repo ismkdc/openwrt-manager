@@ -17,46 +17,46 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS
+          # macOS ARM64 (M1/M2/M3) - native
           - os: macos-15
             target: aarch64-apple-darwin
             suffix: macos-arm64
             bundle: dmg
+          # macOS Intel - native
           - os: macos-15
             target: x86_64-apple-darwin
             suffix: macos-x64
             bundle: dmg
 
-          # Windows
-          - os: windows-2025-arm
+          # Windows ARM64 - native (cross-compile x64 from ARM runner)
+          - os: windows-11-arm
             target: aarch64-pc-windows-msvc
             suffix: windows-arm64
             bundle: msi
-          - os: windows-2025-arm
+          # Windows x64 - cross-compile from ARM runner (faster than x86 emulation)
+          - os: windows-11-arm
             target: x86_64-pc-windows-msvc
             suffix: windows-x64
             bundle: msi
-          - os: windows-2025-arm
-            target: i686-pc-windows-msvc
-            suffix: windows-x86
-            bundle: msi
 
-          # Linux
+          # Linux x64 - native
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             suffix: linux-x64
             bundle: deb
-          - os: ubuntu-24.04
+          # Linux ARM64 - native on ARM runner
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             suffix: linux-arm64
             bundle: deb
-          - os: ubuntu-24.04-arm
+          # Linux ARMhf - cross-compile from x64 (no native armv7 runner)
+          - os: ubuntu-24.04
             target: armv7-unknown-linux-gnueabihf
             suffix: linux-armhf
             bundle: deb
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -72,66 +72,76 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install Node deps
         run: npm ci
 
-      # macOS deps
-      - name: Install macOS dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          brew install jq
+      # --- macOS ---
+      - name: Install macOS deps
+        if: runner.os == 'macOS'
+        run: brew install jq
 
-      # Linux deps
-      - name: Install Linux dependencies
-        if: startsWith(matrix.os, 'ubuntu')
+      # --- Linux ---
+      - name: Install Linux deps (x64)
+        if: runner.os == 'Linux' && matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
-            patchelf libssl-dev libgtk-3-dev libayatana-appindicator3-dev \
-            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-          # ARM cross-compilation deps
-          if [[ "${{ matrix.target }}" == aarch64-unknown-linux-gnu ]]; then
-            sudo apt-get install -y -qq gcc-aarch64-linux-gnu
-          fi
-          if [[ "${{ matrix.target }}" == armv7-unknown-linux-gnueabihf ]]; then
-            sudo apt-get install -y -qq gcc-arm-linux-gnueabihf
-          fi
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf libssl-dev libgtk-3-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
 
-      # Windows deps (WebView2 is preinstalled)
-      - name: Install Windows dependencies
-        if: startsWith(matrix.os, 'windows')
+      - name: Install Linux deps (ARM64 - native on ARM runner)
+        if: runner.os == 'Linux' && matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          choco install -y webview2-runtime
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf libssl-dev libgtk-3-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            gcc-aarch64-linux-gnu
 
-      # Cargo config for cross-compilation
-      - name: Configure cargo for cross-compile
-        if: matrix.target != 'x86_64-unknown-linux-gnu' && matrix.target != 'aarch64-apple-darwin'
+      - name: Install Linux deps + cross-compiler (ARMhf)
+        if: runner.os == 'Linux' && matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf libssl-dev libgtk-3-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            gcc-arm-linux-gnueabihf
+
+      # --- Windows ---
+      - name: Install Windows deps
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # WebView2 is preinstalled on Windows runners
+          echo "WebView2 available"
+
+      # --- Cargo config for cross-compilation ---
+      - name: Configure cargo for cross-compile (ARMhf)
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
         run: |
           mkdir -p .cargo
-          cat >> .cargo/config.toml << 'EOF'
-          [target.aarch64-unknown-linux-gnu]
-          linker = "aarch64-linux-gnu-gcc"
+          cat > .cargo/config.toml << 'EOF'
           [target.armv7-unknown-linux-gnueabihf]
           linker = "arm-linux-gnueabihf-gcc"
           EOF
 
+      # --- Build ---
       - name: Build Tauri app
         run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      # --- Upload ---
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-manager-${{ matrix.suffix }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/
-            src-tauri/target/${{ matrix.target }}/release/bundle/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/*.msi
-            src-tauri/target/${{ matrix.target }}/release/bundle/*.deb
-            src-tauri/target/${{ matrix.target }}/release/bundle/*.AppImage
           if-no-files-found: warn
 
   release:
