@@ -2,8 +2,7 @@
 
 > 🚀 Native cross-platform desktop app for managing OpenWrt routers - faster than the web UI, built with Tauri + React.
 
-![Dashboard](assets/screenshots/dashboard.png)
-![Connection](assets/screenshots/connection.png)
+![Dashboard](ss.png)
 
 ## ✨ Features
 
@@ -93,7 +92,7 @@ The app communicates with OpenWrt routers via the **ubus** JSON-RPC protocol ove
 
 | Dashboard | Network | Wireless |
 |:---:|:---:|:---:|
-| ![Dashboard](assets/screenshots/dashboard.png) | ![Network](assets/screenshots/network.png) | ![Wireless](assets/screenshots/wireless.png) |
+| ![Dashboard](ss.png) | | |
 
 ## 🤝 Contributing
 
