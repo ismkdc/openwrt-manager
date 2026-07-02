@@ -135,12 +135,26 @@ jobs:
         run: |
           echo "## OpenWrt Manager ${{ github.ref_name }}" > notes.md
           echo "" >> notes.md
-          echo "| Platform | Download |" >> notes.md
-          echo "|----------|----------|" >> notes.md
-          for f in artifacts/*/openwrt-manager-*; do
-            name=$(basename "$f")
-            echo "| $name | [Download](https://github.com/ismkdc/openwrt-manager/releases/download/${{ github.ref_name }}/$name) |" >> notes.md
+          echo "### 📥 Downloads" >> notes.md
+          echo "" >> notes.md
+          echo "| Platform | File |" >> notes.md
+          echo "|----------|------|" >> notes.md
+          for dir in artifacts/*/; do
+            file=$(ls "$dir" | head -1)
+            case "$dir" in
+              *macos-arm64*) platform="🍎 macOS Apple Silicon" ;;
+              *macos-x64*)   platform="🍎 macOS Intel" ;;
+              *windows-arm64*) platform="🪟 Windows ARM64" ;;
+              *windows-x64*)   platform="🪟 Windows x64" ;;
+              *linux-arm64*)   platform="🐧 Linux ARM64" ;;
+              *linux-x64*)     platform="🐧 Linux x64" ;;
+              *)              platform="📦 Other" ;;
+            esac
+            echo "| $platform | \`$file\` |" >> notes.md
           done
+          echo "" >> notes.md
+          echo "---" >> notes.md
+          echo "> Built with ❤️ using Tauri + React" >> notes.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
