@@ -1,6 +1,6 @@
 # OpenWrt Manager
 
-> 🚀 Native cross-platform desktop app for managing OpenWrt routers — faster than the web UI, built with Tauri + React.
+> 🚀 Native cross-platform desktop app for managing OpenWrt routers - faster than the web UI, built with Tauri + React.
 
 ![Dashboard](assets/screenshots/dashboard.png)
 ![Connection](assets/screenshots/connection.png)
@@ -9,7 +9,7 @@
 
 | Feature | Description |
 |---------|-------------|
-| 📊 **Dashboard** | System info, memory/storage usage, CPU load graphs, uptime, firmware version — at a glance |
+| 📊 **Dashboard** | System info, memory/storage usage, CPU load graphs, uptime, firmware version - at a glance |
 | 🔌 **Network** | List interfaces, IP addresses, status, traffic |
 | 📡 **Wireless** | Radio status, SSIDs, encryption, signal strength |
 | 🛡️ **Firewall** | Zones, rules, forwarding |
@@ -74,7 +74,7 @@ openwrt-manager/
 
 ### How it works
 
-The app communicates with OpenWrt routers via the **ubus** JSON-RPC protocol over HTTP — the same protocol LuCI (the web UI) uses internally. No SSH required, no agent installation needed on the router.
+The app communicates with OpenWrt routers via the **ubus** JSON-RPC protocol over HTTP - the same protocol LuCI (the web UI) uses internally. No SSH required, no agent installation needed on the router.
 
 1. Connect to your router's IP
 2. Login with root credentials
@@ -97,7 +97,7 @@ The app communicates with OpenWrt routers via the **ubus** JSON-RPC protocol ove
 
 ## 🤝 Contributing
 
-PRs welcome! This is a community project — the more contributors, the better the router management experience gets.
+PRs welcome! This is a community project - the more contributors, the better the router management experience gets.
 
 ## 📄 License
 
