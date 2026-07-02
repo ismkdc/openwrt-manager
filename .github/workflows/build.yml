@@ -105,13 +105,21 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      # --- Upload ---
-      - name: Upload artifacts
+      # --- Upload only the installer file ---
+      - name: Find installer file
+        id: find
+        shell: bash
+        run: |
+          dir="src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/"
+          file=$(ls "$dir" | grep -i -E "\.(dmg|msi|deb)$" | head -1)
+          echo "file=$dir$file" >> "$GITHUB_OUTPUT"
+          echo "Found: $dir$file"
+
+      - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
           name: openwrt-manager-${{ matrix.suffix }}
-          path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/
+          path: ${{ steps.find.outputs.file }}
           if-no-files-found: error
 
   release:
