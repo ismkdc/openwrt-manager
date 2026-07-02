@@ -148,3 +148,4 @@ jobs:
           body_path: notes.md
           files: artifacts/**/*
           generate_release_notes: false
+          draft: false
