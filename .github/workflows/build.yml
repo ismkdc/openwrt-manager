@@ -1,0 +1,158 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS
+          - os: macos-15
+            target: aarch64-apple-darwin
+            suffix: macos-arm64
+            bundle: dmg
+          - os: macos-15
+            target: x86_64-apple-darwin
+            suffix: macos-x64
+            bundle: dmg
+
+          # Windows
+          - os: windows-2025-arm
+            target: aarch64-pc-windows-msvc
+            suffix: windows-arm64
+            bundle: msi
+          - os: windows-2025-arm
+            target: x86_64-pc-windows-msvc
+            suffix: windows-x64
+            bundle: msi
+          - os: windows-2025-arm
+            target: i686-pc-windows-msvc
+            suffix: windows-x86
+            bundle: msi
+
+          # Linux
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-x64
+            bundle: deb
+          - os: ubuntu-24.04
+            target: aarch64-unknown-linux-gnu
+            suffix: linux-arm64
+            bundle: deb
+          - os: ubuntu-24.04-arm
+            target: armv7-unknown-linux-gnueabihf
+            suffix: linux-armhf
+            bundle: deb
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # macOS deps
+      - name: Install macOS dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install jq
+
+      # Linux deps
+      - name: Install Linux dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libssl-dev libgtk-3-dev libayatana-appindicator3-dev \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+          # ARM cross-compilation deps
+          if [[ "${{ matrix.target }}" == aarch64-unknown-linux-gnu ]]; then
+            sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+          fi
+          if [[ "${{ matrix.target }}" == armv7-unknown-linux-gnueabihf ]]; then
+            sudo apt-get install -y -qq gcc-arm-linux-gnueabihf
+          fi
+
+      # Windows deps (WebView2 is preinstalled)
+      - name: Install Windows dependencies
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          choco install -y webview2-runtime
+
+      # Cargo config for cross-compilation
+      - name: Configure cargo for cross-compile
+        if: matrix.target != 'x86_64-unknown-linux-gnu' && matrix.target != 'aarch64-apple-darwin'
+        run: |
+          mkdir -p .cargo
+          cat >> .cargo/config.toml << 'EOF'
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          [target.armv7-unknown-linux-gnueabihf]
+          linker = "arm-linux-gnueabihf-gcc"
+          EOF
+
+      - name: Build Tauri app
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-manager-${{ matrix.suffix }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/
+            src-tauri/target/${{ matrix.target }}/release/bundle/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/*.AppImage
+          if-no-files-found: warn
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        run: |
+          echo "## OpenWrt Manager ${{ github.ref_name }}" > notes.md
+          echo "" >> notes.md
+          echo "### Downloads" >> notes.md
+          find artifacts -type f | sort >> notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: artifacts/**/*
+          generate_release_notes: false
