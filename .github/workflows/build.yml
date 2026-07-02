@@ -17,40 +17,41 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS ARM64 (M1/M2/M3) - native
+          # ---- macOS ----
           - os: macos-15
             target: aarch64-apple-darwin
             suffix: macos-arm64
             bundle: dmg
-          # macOS Intel - native
+            label: macOS ARM64
           - os: macos-15
             target: x86_64-apple-darwin
             suffix: macos-x64
             bundle: dmg
+            label: macOS Intel
 
-          # Windows ARM64 - native (cross-compile x64 from ARM runner)
+          # ---- Windows ----
           - os: windows-11-arm
             target: aarch64-pc-windows-msvc
             suffix: windows-arm64
             bundle: msi
-          # Windows x64 - cross-compile from ARM runner (faster than x86 emulation)
-          - os: windows-11-arm
+            label: Windows ARM64
+          - os: windows-2025
             target: x86_64-pc-windows-msvc
             suffix: windows-x64
             bundle: msi
+            label: Windows x64
 
-          # Linux x64 - native
-          - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            suffix: linux-x64
-            bundle: deb
-          # Linux ARM64 - native on ARM runner
+          # ---- Linux ----
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             suffix: linux-arm64
             bundle: deb
-          # Linux ARMhf - SKIPPED: cross-compiling GTK/WebKit is not feasible on CI
-          # Build natively on the target device instead.
+            label: Linux ARM64
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-x64
+            bundle: deb
+            label: Linux x64
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -77,9 +78,9 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install jq
 
-      # --- Linux ---
-      - name: Install Linux deps (x64)
-        if: runner.os == 'Linux' && matrix.target == 'x86_64-unknown-linux-gnu'
+      # --- Linux (x64) ---
+      - name: Install Linux x64 deps
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
@@ -87,30 +88,18 @@ jobs:
             patchelf libssl-dev libgtk-3-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
 
-      - name: Install Linux deps (ARM64 - native on ARM runner)
-        if: runner.os == 'Linux' && matrix.target == 'aarch64-unknown-linux-gnu'
+      # --- Linux (ARM64) ---
+      - name: Install Linux ARM64 deps
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
             patchelf libssl-dev libgtk-3-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            gcc-aarch64-linux-gnu
-
-
-
-      # --- Windows ---
-      - name: Install Windows deps
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # WebView2 is preinstalled on Windows runners
-          echo "WebView2 available"
-
-
+            libjavascriptcoregtk-4.1-dev
 
       # --- Build ---
-      - name: Build Tauri app
+      - name: Build Tauri app (${{ matrix.label }})
         run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -123,7 +112,7 @@ jobs:
           name: openwrt-manager-${{ matrix.suffix }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/
-          if-no-files-found: warn
+          if-no-files-found: error
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -138,8 +127,12 @@ jobs:
         run: |
           echo "## OpenWrt Manager ${{ github.ref_name }}" > notes.md
           echo "" >> notes.md
-          echo "### Downloads" >> notes.md
-          find artifacts -type f | sort >> notes.md
+          echo "| Platform | Download |" >> notes.md
+          echo "|----------|----------|" >> notes.md
+          for f in artifacts/*/openwrt-manager-*; do
+            name=$(basename "$f")
+            echo "| $name | [Download](https://github.com/ismkdc/openwrt-manager/releases/download/${{ github.ref_name }}/$name) |" >> notes.md
+          done
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
