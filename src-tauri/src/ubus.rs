@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use rand::RngExt;
 use serde_json::{json, Value};
 
 /// Raw ubus JSON-RPC call
@@ -82,7 +83,7 @@ pub async fn login(base_url: &str, username: &str, password: &str) -> Result<Str
     // Set CSRF token like LuCI does
     let token = (0..32).map(|_| {
         let chars: &[u8] = b"abcdef0123456789";
-        chars[rand::random::<usize>() % 16] as char
+        chars[rand::rng().random_range(0..16)] as char
     }).collect::<String>();
 
     let _ = ubus_call(base_url, &session, "session", "set", Some(json!({
